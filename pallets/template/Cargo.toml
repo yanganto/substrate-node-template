@@ -7,6 +7,7 @@ license = 'Unlicense'
 name = 'pallet-template'
 repository = 'https://github.com/paritytech/substrate/'
 version = '2.0.0-alpha.5'
+
 [dependencies.codec]
 default-features = false
 features = ['derive']
@@ -15,8 +16,6 @@ version = '1.2.0'
 
 [dependencies.frame-support]
 default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-rev = 'd9e989a4b2ac16f6484eb954ed893091c6ac5ae1'
 version = '2.0.0-alpha.5'
 
 [dependencies.safe-mix]
@@ -25,26 +24,19 @@ version = '1.0.0'
 
 [dependencies.system]
 default-features = false
-git = 'https://github.com/paritytech/substrate.git'
 package = 'frame-system'
-rev = 'd9e989a4b2ac16f6484eb954ed893091c6ac5ae1'
 version = '2.0.0-alpha.5'
+
 [dev-dependencies.sp-core]
 default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-rev = 'd9e989a4b2ac16f6484eb954ed893091c6ac5ae1'
 version = '2.0.0-alpha.5'
 
 [dev-dependencies.sp-io]
 default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-rev = 'd9e989a4b2ac16f6484eb954ed893091c6ac5ae1'
 version = '2.0.0-alpha.5'
 
 [dev-dependencies.sp-runtime]
 default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-rev = 'd9e989a4b2ac16f6484eb954ed893091c6ac5ae1'
 version = '2.0.0-alpha.5'
 
 [features]
