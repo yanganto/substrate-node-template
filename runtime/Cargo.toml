@@ -147,10 +147,10 @@ package = 'frame-system'
 tag = 'v2.0.0-rc1'
 version = '2.0.0-rc1'
 
-[dependencies.template]
+[dependencies.kitty]
 default-features = false
-package = 'pallet-template'
-path = '../pallets/template'
+package = 'pallet-kitty'
+path = '../pallets/kitty'
 version = '2.0.0-rc1'
 
 [dependencies.timestamp]
@@ -194,7 +194,7 @@ std = [
     'system/std',
     'timestamp/std',
     'transaction-payment/std',
-    'template/std',
+    'kitty/std',
 ]
 
 [build-dependencies.wasm-builder-runner]

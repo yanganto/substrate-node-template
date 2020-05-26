@@ -1,11 +1,8 @@
 [package]
-authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-description = 'FRAME pallet template'
+authors = ['Antonio <https://github.com/yanganto>']
 edition = '2018'
-homepage = 'https://substrate.io'
 license = 'Unlicense'
-name = 'pallet-template'
-repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
+name = 'pallet-kitty'
 version = '2.0.0-rc1'
 
 [dependencies.codec]
