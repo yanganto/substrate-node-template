@@ -2645,8 +2645,8 @@ dependencies = [
  "pallet-balances",
  "pallet-grandpa",
  "pallet-randomness-collective-flip",
+ "pallet-relay",
  "pallet-sudo",
- "pallet-template",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "parity-scale-codec",
@@ -2888,6 +2888,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-relay"
+version = "2.0.0-rc1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-session"
 version = "2.0.0-rc1"
 source = "git+https://github.com/paritytech/substrate.git?tag=v2.0.0-rc1#599ba75bc2b5acd238c21c5c7efe8e2ad8d401ee"
@@ -2917,18 +2930,6 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
-]
-
-[[package]]
-name = "pallet-template"
-version = "2.0.0-rc1"
-dependencies = [
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "sp-core",
- "sp-io",
- "sp-runtime",
 ]
 
 [[package]]

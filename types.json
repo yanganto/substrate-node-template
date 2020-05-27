@@ -1,0 +1,12 @@
+{
+  "EthHeader": {
+    "lie": "u32",
+    "block_height": "u32"
+  },
+  "RelayHeader": {
+    "header": "EthHeader",
+    "relay_position": "BlockNumber",
+    "challenge_block_height": "BlockNumber",
+    "relayer": "Vec<AccountId>"
+  }
+}

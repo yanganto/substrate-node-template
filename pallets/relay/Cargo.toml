@@ -1,11 +1,7 @@
 [package]
-authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-description = 'FRAME pallet template'
+description = 'relay pallet for relayers-only mode'
 edition = '2018'
-homepage = 'https://substrate.io'
-license = 'Unlicense'
-name = 'pallet-template'
-repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
+name = 'pallet-relay'
 version = '2.0.0-rc1'
 
 [dependencies.codec]
@@ -38,7 +34,13 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc1'
 version = '2.0.0-rc1'
 
-[dev-dependencies.sp-runtime]
+[dependencies.sp-std]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc1'
+version = '2.0.0-rc1'
+
+[dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc1'
@@ -50,4 +52,5 @@ std = [
     'codec/std',
     'frame-support/std',
     'frame-system/std',
+    'sp-std/std',
 ]
