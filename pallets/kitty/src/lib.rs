@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use balances;
+use codec::{Decode, Encode};
 /// A FRAME pallet template with necessary imports
 
 /// Feel free to remove or edit this file as needed.
@@ -10,6 +12,7 @@
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
+use sp_runtime::RuntimeDebug;
 
 #[cfg(test)]
 mod mock;
@@ -17,8 +20,16 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[derive(Encode, Decode, Default, Clone, PartialEq, RuntimeDebug)]
+pub struct Kitty<Hash, Balance> {
+    id: Hash,
+    dna: Hash,
+    price: Balance,
+    gen: u64,
+}
+
 /// The pallet's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait + balances::Trait {
     // Add other types and constants required to configure this pallet.
 
     /// The overarching event type.
@@ -35,6 +46,7 @@ decl_storage! {
         // Here we are declaring a StorageValue, `Something` as a Option<u32>
         // `get(fn something)` is the default getter which returns either the stored `u32` or `None` if nothing stored
         Something get(fn something): Option<u32>;
+        OwnedKitty get(fn kitty_of_owner) : map hasher(identity) T::AccountId => Option<Kitty<T::Hash, T::Balance>>;
     }
 }
 

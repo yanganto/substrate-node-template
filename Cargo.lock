@@ -2880,6 +2880,7 @@ version = "2.0.0-rc1"
 dependencies = [
  "frame-support",
  "frame-system",
+ "pallet-balances",
  "parity-scale-codec",
  "sp-core",
  "sp-io",
