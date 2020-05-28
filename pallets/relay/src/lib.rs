@@ -1,7 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use frame_support::{debug::info, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
-use sp_std::vec;
+use sp_std::{prelude::Vec, vec};
+
+const CHANGE_WAITING_BLOCKS: u32 = 100;
 
 #[cfg(test)]
 mod mock;
@@ -17,7 +19,9 @@ pub trait Trait: system::Trait {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Relay {
-        pub LastComfirmedHeader get(fn last_comfirm_header): Option<types::RelayHeader::<T::AccountId, T::BlockNumber>>;
+        LastComfirmedHeader get(fn last_comfirm_header): Option<types::EthHeader>;
+        SubmitHeadersMap get(fn submit_headers_map): map hasher(blake2_128_concat) types::EthereumBlockHeightType => Vec<types::RelayHeader::<T::AccountId, T::BlockNumber>>;
+        SubmitHeaders get(fn submit_headers): Vec<types::EthereumBlockHeightType>;
     }
 }
 
@@ -27,12 +31,14 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
     {
         UpdateLastComfrimedBlock(u32, AccountId),
+        SubmitBlock(u32, AccountId),
     }
 );
 
 decl_error! {
     pub enum Error for Module<T: Trait> {
         HeaderInvalid,
+        SubmitBlockAlreadyComfirmed,
     }
 }
 
@@ -43,20 +49,65 @@ decl_module! {
 
         #[weight = 0]
         pub fn set_last_comfirm_header(origin, header: types::EthHeader) -> dispatch::DispatchResult {
-            info!(target: "relay", "header: {:?}", header);
+            info!(target: "relay", "last comfirm header: {:?}", header);
             if header.lie > 0 {
                 Err(<Error<T>>::HeaderInvalid)?;
             }
             let who = ensure_signed(origin)?;
             let block_height = header.block_height;
-            let relay_header = types::RelayHeader::<<T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber> {
-                header: header,
-                relay_position: 0u32.into(),
-                challenge_block_height: 0u32.into(),
-                relayer: vec![who.clone()]
-            };
-            <LastComfirmedHeader<T>>::put(relay_header);
+
+            LastComfirmedHeader::put(header);
+
             Self::deposit_event(RawEvent::UpdateLastComfrimedBlock(block_height, who));
+            Ok(())
+        }
+
+        #[weight = 0]
+        pub fn submit(origin, header: types::EthHeader) -> dispatch::DispatchResult {
+            info!(target: "relay", "submit header: {:?}", header);
+            if header.lie > 0 {
+                Err(<Error<T>>::HeaderInvalid)?;
+            }
+
+
+            let who = ensure_signed(origin)?;
+            let block_height: types::EthereumBlockHeightType = header.block_height;
+            let mut submissions;
+
+            if <SubmitHeadersMap<T>>::contains_key(block_height) {
+                submissions = <SubmitHeadersMap<T>>::get(block_height);
+                let mut is_exist = false;
+                for rh in submissions.iter_mut() {
+                    if header == rh.header {
+                        rh.relayers.push(who.clone());
+                        is_exist = true;
+                        break;
+                    }
+                }
+                if !is_exist {
+                    let current_block = <frame_system::Module<T>>::block_number();
+                    let relay_header = types::RelayHeader::<<T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber> {
+                        header: header,
+                        relay_position: current_block,
+                        challenge_block_height: current_block + CHANGE_WAITING_BLOCKS.into(),
+                        relayers: vec![who.clone()]
+                    };
+                    submissions.push(relay_header);
+                }
+            } else {
+                let current_block = <frame_system::Module<T>>::block_number();
+                let relay_header = types::RelayHeader::<<T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber> {
+                    header: header,
+                    relay_position: current_block.into(),
+                    challenge_block_height: current_block + CHANGE_WAITING_BLOCKS.into(),
+                    relayers: vec![who.clone()]
+                };
+                submissions = vec![relay_header];
+                SubmitHeaders::mutate(|v| v.push(block_height));
+            }
+            <SubmitHeadersMap<T>>::insert(block_height, submissions);
+
+            Self::deposit_event(RawEvent::SubmitBlock(block_height, who));
             Ok(())
         }
     }

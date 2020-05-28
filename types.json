@@ -7,6 +7,6 @@
     "header": "EthHeader",
     "relay_position": "BlockNumber",
     "challenge_block_height": "BlockNumber",
-    "relayer": "Vec<AccountId>"
+    "relayers": "Vec<AccountId>"
   }
 }
