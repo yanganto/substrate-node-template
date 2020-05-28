@@ -3,7 +3,7 @@ use frame_support::{debug::info, decl_error, decl_event, decl_module, decl_stora
 use frame_system::{self as system, ensure_signed};
 use sp_std::{prelude::Vec, vec};
 
-const CHANGE_WAITING_BLOCKS: u32 = 100;
+const CHANGE_WAITING_BLOCKS: u32 = 10;
 
 #[cfg(test)]
 mod mock;
@@ -125,6 +125,29 @@ decl_module! {
 
             Self::deposit_event(RawEvent::SubmitHeader(block_height, who));
             Ok(())
+        }
+
+        fn offchain_worker(block: T::BlockNumber) {
+            let submit_headers  = SubmitHeaders::get();
+            let mut honest_relayers = Vec::new();
+            if let Some(last) = submit_headers.last() {
+                let submissions = <SubmitHeadersMap<T>>::get(last);
+                if submissions.len() == 1 && submissions[0].challenge_block_height < block {
+                    honest_relayers = submissions[0].relayers.clone();
+                    LastComfirmedHeader::put(submissions[0].header.clone());
+                    Self::deposit_event(
+                        RawEvent::UpdateLastComfrimedBlock(submissions[0].header.block_height,
+                                                           honest_relayers[0].clone()));
+                }
+
+            }
+            if honest_relayers.len() > 1 {
+                // TODO: slash and reward here
+                info!("Honest Relayers: {:?}", honest_relayers);
+            }
+
+            SubmitHeaders::mutate(|_| Vec::<types::EthereumBlockHeightType>::new());
+            NextSamplingHeader::mutate(|_| None as Option<types::EthereumBlockHeightType>);
         }
     }
 }
