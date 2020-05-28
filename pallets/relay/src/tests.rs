@@ -65,6 +65,16 @@ fn test_submit_header() {
                 block_height: 100
             }
         ));
+        assert_noop!(
+            Relay::submit(
+                Origin::signed(2),
+                crate::types::EthHeader {
+                    lie: 0,
+                    block_height: 99
+                }
+            ),
+            Error::<Test>::SubmitHeaderNotInSamplingList
+        );
 
         assert_eq!(Relay::submit_headers_map(100).len(), 1);
         assert_eq!(Relay::submit_headers_map(100)[0].relayers.len(), 2);
@@ -72,5 +82,17 @@ fn test_submit_header() {
         assert_eq!(Relay::submit_headers_map(100)[0].relayers[1], 2);
         assert_eq!(Relay::submit_headers().len(), 1);
         assert_eq!(Relay::submit_headers()[0], 100);
+        assert_eq!(Relay::next_sampling_header(), Some(50));
+        assert_ok!(Relay::submit(
+            Origin::signed(1),
+            crate::types::EthHeader {
+                lie: 0,
+                block_height: 50
+            }
+        ));
+        assert_eq!(Relay::submit_headers().len(), 2);
+        assert_eq!(Relay::submit_headers_map(50).len(), 1);
+        assert_eq!(Relay::submit_headers_map(50)[0].relayers.len(), 1);
+        assert_eq!(Relay::next_sampling_header(), Some(25));
     });
 }

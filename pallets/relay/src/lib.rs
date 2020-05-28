@@ -22,6 +22,7 @@ decl_storage! {
         LastComfirmedHeader get(fn last_comfirm_header): Option<types::EthHeader>;
         SubmitHeadersMap get(fn submit_headers_map): map hasher(blake2_128_concat) types::EthereumBlockHeightType => Vec<types::RelayHeader::<T::AccountId, T::BlockNumber>>;
         SubmitHeaders get(fn submit_headers): Vec<types::EthereumBlockHeightType>;
+        NextSamplingHeader get(fn next_sampling_header): Option<types::EthereumBlockHeightType>;
     }
 }
 
@@ -31,14 +32,15 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
     {
         UpdateLastComfrimedBlock(u32, AccountId),
-        SubmitBlock(u32, AccountId),
+        SubmitHeader(u32, AccountId),
     }
 );
 
 decl_error! {
     pub enum Error for Module<T: Trait> {
         HeaderInvalid,
-        SubmitBlockAlreadyComfirmed,
+        SubmitHeaderAlreadyComfirmed,
+        SubmitHeaderNotInSamplingList,
     }
 }
 
@@ -68,7 +70,19 @@ decl_module! {
             if header.lie > 0 {
                 Err(<Error<T>>::HeaderInvalid)?;
             }
+            let current_block = <frame_system::Module<T>>::block_number();
 
+            if let Some(next) = NextSamplingHeader::get(){
+                if header.block_height != next {
+                    if <SubmitHeadersMap<T>>::contains_key(header.block_height) {
+                        if current_block > <SubmitHeadersMap<T>>::get(header.block_height)[0].challenge_block_height {
+                            Err(<Error<T>>::SubmitHeaderAlreadyComfirmed)?;
+                        }
+                    } else {
+                        Err(<Error<T>>::SubmitHeaderNotInSamplingList)?;
+                    }
+                }
+            }
 
             let who = ensure_signed(origin)?;
             let block_height: types::EthereumBlockHeightType = header.block_height;
@@ -85,7 +99,6 @@ decl_module! {
                     }
                 }
                 if !is_exist {
-                    let current_block = <frame_system::Module<T>>::block_number();
                     let relay_header = types::RelayHeader::<<T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber> {
                         header: header,
                         relay_position: current_block,
@@ -104,10 +117,13 @@ decl_module! {
                 };
                 submissions = vec![relay_header];
                 SubmitHeaders::mutate(|v| v.push(block_height));
+                let last_comfirm_header = if let Some(h) =LastComfirmedHeader::get() {h.block_height} else {0 as types::EthereumBlockHeightType};
+                let next_sampling_block_height = (last_comfirm_header + block_height) / 2;
+                NextSamplingHeader::put(next_sampling_block_height);
             }
             <SubmitHeadersMap<T>>::insert(block_height, submissions);
 
-            Self::deposit_event(RawEvent::SubmitBlock(block_height, who));
+            Self::deposit_event(RawEvent::SubmitHeader(block_height, who));
             Ok(())
         }
     }
