@@ -17,7 +17,7 @@ pub trait Trait: system::Trait {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Relay {
-        pub LastComfirmedHeader get(fn header): Option<types::RelayHeader::<T::AccountId, T::BlockNumber>>;
+        pub LastComfirmedHeader get(fn last_comfirm_header): Option<types::RelayHeader::<T::AccountId, T::BlockNumber>>;
     }
 }
 
