@@ -1,12 +1,13 @@
 {
   "EthHeader": {
     "lie": "u32",
-    "block_height": "u32"
+    "block_height": "EthereumBlockHeightType"
   },
   "RelayHeader": {
     "header": "EthHeader",
     "relay_position": "BlockNumber",
     "challenge_block_height": "BlockNumber",
     "relayers": "Vec<AccountId>"
-  }
+  },
+  "EthereumBlockHeightType": "u32"
 }
