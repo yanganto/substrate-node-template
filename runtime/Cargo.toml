@@ -147,10 +147,16 @@ package = 'frame-system'
 tag = 'v2.0.0-rc2'
 version = '2.0.0-rc2'
 
-[dependencies.template]
+[dependencies.sample]
 default-features = false
-package = 'pallet-template'
-path = '../pallets/template'
+package = 'pallet-sample'
+path = '../pallets/sample'
+version = '2.0.0-rc2'
+
+[dependencies.relay]
+default-features = false
+package = 'pallet-relay'
+path = '../pallets/relay'
 version = '2.0.0-rc2'
 
 [dependencies.timestamp]
@@ -194,7 +200,8 @@ std = [
     'system/std',
     'timestamp/std',
     'transaction-payment/std',
-    'template/std',
+    'sample/std',
+    'relay/std',
 ]
 
 [build-dependencies.wasm-builder-runner]
