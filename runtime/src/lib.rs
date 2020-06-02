@@ -253,8 +253,13 @@ impl sudo::Trait for Runtime {
     type Call = Call;
 }
 
+parameter_types! {
+    pub const ChainType: sample::ChainType = sample::ChainType::Normal;
+}
+
 impl sample::Trait for Runtime {
     type Event = Event;
+    type ChainType = ChainType;
 }
 
 construct_runtime!(
