@@ -3,6 +3,8 @@
 use crate::sp_api_hidden_includes_decl_storage::hidden_include::traits::Randomness;
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get};
 use frame_system::{self as system, ensure_signed};
+use sp_runtime::traits::{BlakeTwo256, Hash};
+use sp_runtime::RandomNumberGenerator;
 use sp_std::prelude::Vec;
 
 #[cfg(test)]
@@ -66,8 +68,8 @@ decl_module! {
             if !SamplingBlocks::contains_key((disagree, agree)) {
                 let r = <pallet_randomness_collective_flip::Module<T>>::random_seed();
                 let sample_position = match T::ChainType::get() {
-                    ChainType::POW => Self::get_sample_tail_more_from_random_number(disagree, agree, r.as_ref()[0] as f32),
-                    _ => Self::get_sample_from_random_number(disagree, agree, r.as_ref()[0] as f32)
+                    ChainType::POW => Self::get_sample_tail_more_from_random_number(disagree, agree, r),
+                    _ => Self::get_sample_from_random_number(disagree, agree, r),
                 };
                 // TODO: take the confirmed blocks into consideration
                 SamplingBlocks::insert((disagree, agree), sample_position);
@@ -82,35 +84,39 @@ impl<T: Trait> Module<T> {
     fn get_sample_from_random_number(
         e1: EthereumBlockHeightType,
         e2: EthereumBlockHeightType,
-        r: f32,
+        r: <T as frame_system::Trait>::Hash,
     ) -> EthereumBlockHeightType {
-        let eth_range: f32;
-        let base: f32;
+        let random_seed = BlakeTwo256::hash(r.as_ref());
+        let mut rng = <RandomNumberGenerator<BlakeTwo256>>::new(random_seed);
+        let eth_range: u32;
+        let base: u32;
         if e2 > e1 {
-            eth_range = (e2 - e1) as f32;
-            base = e1 as f32 + 1.0;
+            eth_range = e2 - e1 - 2;
+            base = e1 + 1;
         } else {
-            eth_range = (e1 - e2) as f32;
-            base = e2 as f32 + 1.0;
+            eth_range = e1 - e2 - 2;
+            base = e2 + 1;
         };
-        (base + (eth_range * r / 255f32)) as EthereumBlockHeightType
+        base + rng.pick_u32(eth_range)
     }
     /// This function is for PoW chain, sample on tail part more
     fn get_sample_tail_more_from_random_number(
         e1: EthereumBlockHeightType,
         e2: EthereumBlockHeightType,
-        r: f32,
+        r: <T as frame_system::Trait>::Hash,
     ) -> EthereumBlockHeightType {
-        let eth_range: f32;
-        let base: f32;
+        let random_seed = BlakeTwo256::hash(r.as_ref());
+        let mut rng = <RandomNumberGenerator<BlakeTwo256>>::new(random_seed);
+        let eth_range: u32;
+        let base: u32;
         if e2 > e1 {
-            eth_range = (e2 - e1) as f32;
-            base = e1 as f32 + 1.0;
+            eth_range = e2 - e1 - 2;
+            base = e1 + 1;
         } else {
-            eth_range = (e1 - e2) as f32;
-            base = e2 as f32 + 1.0;
+            eth_range = e1 - e2 - 2;
+            base = e2 + 1;
         };
         // TODO: Use a better sampling equation for POW chain
-        (base + (eth_range * r / 255f32)) as EthereumBlockHeightType
+        base + rng.pick_u32(eth_range)
     }
 }
