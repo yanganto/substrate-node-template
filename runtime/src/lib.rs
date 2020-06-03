@@ -255,11 +255,13 @@ impl sudo::Trait for Runtime {
 
 parameter_types! {
     pub const ChainType: sample::ChainType = sample::ChainType::Normal;
+    pub const ConfrimBlockAttractRange: sample::EthereumBlockHeightType = 10;
 }
 
 impl sample::Trait for Runtime {
     type Event = Event;
     type ChainType = ChainType;
+    type ConfrimBlockAttractRange = ConfrimBlockAttractRange;
 }
 
 construct_runtime!(
