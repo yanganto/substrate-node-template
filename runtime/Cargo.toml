@@ -153,6 +153,12 @@ package = 'pallet-sample'
 path = '../pallets/sample'
 version = '2.0.0-rc2'
 
+[dependencies.relay]
+default-features = false
+package = 'pallet-relay'
+path = '../pallets/relay'
+version = '2.0.0-rc2'
+
 [dependencies.timestamp]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -195,6 +201,7 @@ std = [
     'timestamp/std',
     'transaction-payment/std',
     'sample/std',
+    'relay/std',
 ]
 
 [build-dependencies.wasm-builder-runner]

@@ -42,6 +42,7 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 pub use timestamp::Call as TimestampCall;
 
+pub use relay;
 pub use sample;
 
 /// An index to a block.
@@ -264,6 +265,10 @@ impl sample::Trait for Runtime {
     type ConfrimBlockAttractRange = ConfrimBlockAttractRange;
 }
 
+impl relay::Trait for Runtime {
+    type Event = Event;
+}
+
 construct_runtime!(
     pub enum Runtime where
         Block = Block,
@@ -278,7 +283,8 @@ construct_runtime!(
         Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
         Sudo: sudo::{Module, Call, Config<T>, Storage, Event<T>},
-        SampleModule: sample::{Module, Call, Storage, Event<T>},
+        SampleFunction: sample::{Module, Call, Storage, Event<T>},
+        Relay: relay::{Module, Call, Storage, Event<T>},
     }
 );
 
