@@ -1,9 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use frame_support::{debug::info, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
+use sample::SamplingBlocks;
 use sp_std::{prelude::Vec, vec};
 
-const CHANGE_WAITING_BLOCKS: u32 = 10;
+const CHANGE_WAITING_BLOCKS: u32 = 50;
 
 #[cfg(test)]
 mod mock;
@@ -13,16 +14,20 @@ mod tests;
 
 mod types;
 
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait + sample::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 decl_storage! {
     trait Store for Module<T: Trait> as Relay {
+        /// This the `G` for as README of relayer-game
         LastComfirmedHeader get(fn last_comfirm_header): Option<types::EthHeader>;
-        SubmitHeadersMap get(fn submit_headers_map): map hasher(blake2_128_concat) types::EthereumBlockHeightType => Vec<types::RelayHeader::<T::AccountId, T::BlockNumber>>;
+
+        /// Here we use (header.block_height, header.lie) as Proposal ID to store
+        /// In real scenario, we should use (header.block_height, header.hash) as Proposal ID
+        ProposalMap get(fn proposal_map): map hasher(blake2_128_concat) (types::EthereumBlockHeightType, u32) => types::Proposal::<T::AccountId, T::BlockNumber>;
+
         SubmitHeaders get(fn submit_headers): Vec<types::EthereumBlockHeightType>;
-        NextSamplingHeader get(fn next_sampling_header): Option<types::EthereumBlockHeightType>;
     }
 }
 
@@ -39,8 +44,8 @@ decl_event!(
 decl_error! {
     pub enum Error for Module<T: Trait> {
         HeaderInvalid,
-        SubmitHeaderAlreadyComfirmed,
-        SubmitHeaderNotInSamplingList,
+        ProposalLevelInvalid,
+        AgainstAbsent,
     }
 }
 
@@ -65,89 +70,93 @@ decl_module! {
         }
 
         #[weight = 0]
-        pub fn submit(origin, header: types::EthHeader) -> dispatch::DispatchResult {
-            info!(target: "relay", "submit header: {:?}", header);
-            if header.lie > 0 {
-                Err(<Error<T>>::HeaderInvalid)?;
+        pub fn submit(origin, proposal: types::Proposal::<T::AccountId, T::BlockNumber>) -> dispatch::DispatchResult {
+            info!(target: "relay", "submit proposal: {:?}", proposal);
+
+            // NOTE In production, the handler should check this
+            // if proposal.header.lie > 0 {
+            //     Err(<Error<T>>::HeaderInvalid)?;
+            // }
+
+            let proposal_level_correct = if let Some(take_over_proposal_id) = proposal.take_over {
+                let take_over_proposal = <ProposalMap<T>>::get(take_over_proposal_id);
+                take_over_proposal.level + 1 == proposal.level
+            } else {
+                1 == proposal.level
+            };
+
+            if !proposal_level_correct {
+                Err(<Error<T>>::ProposalLevelInvalid)?;
             }
+
+            // find out the agree position and the disagree position
+            let mut agree: Option<types::EthereumBlockHeightType> = None;
+            let mut disagree: Option<types::EthereumBlockHeightType> = None;
+            let submit_headers = SubmitHeaders::get();
+
+            if submit_headers.contains(&proposal.header.block_height) {
+                agree = Some(proposal.header.block_height);
+                let mut against_proposal_id = proposal.against;
+                while against_proposal_id.is_some(){
+                    let against_proposal = <ProposalMap<T>>::get(against_proposal_id.unwrap());
+                    if  against_proposal.header.block_height < proposal.header.block_height {
+                        continue;
+                    }
+
+                    if disagree.is_none() {
+                        disagree = Some(against_proposal.header.block_height);
+                    } else if let Some(disagree_block_height) = disagree {
+                        if against_proposal.header.block_height < disagree_block_height {
+                            disagree = Some(against_proposal.header.block_height);
+                        }
+                    }
+                    against_proposal_id = against_proposal.take_over;
+                }
+
+            } else {
+                if proposal.against.is_none() {
+                    Err(<Error<T>>::AgainstAbsent)?;
+                }
+                let mut take_over_proposal_id = proposal.take_over;
+                while take_over_proposal_id.is_some() {
+                    let take_over_proposal = <ProposalMap<T>>::get(take_over_proposal_id.unwrap());
+                    if  take_over_proposal.header.block_height > proposal.header.block_height {
+                        continue;
+                    }
+                    if agree.is_none() {
+                        agree = Some(take_over_proposal.header.block_height);
+                    } else if let Some(agree_block_height) = agree {
+                        if take_over_proposal.header.block_height > agree_block_height {
+                            agree = Some(take_over_proposal.header.block_height);
+                        }
+                    }
+                    take_over_proposal_id = take_over_proposal.take_over;
+                }
+                if agree.is_none() {
+                    // use genesis or last comfirmed block for the agree point
+                    agree = if let Some(h) = LastComfirmedHeader::get() {
+                        Some(h.block_height)
+                    }else {
+                        Some(0)
+                    };
+                }
+
+                let against_proposal = <ProposalMap<T>>::get(proposal.against.unwrap());
+                disagree = Some(against_proposal.header.block_height);
+            }
+
+            // TODO: add a challenge_time for the proposal
             let current_block = <frame_system::Module<T>>::block_number();
 
-            if let Some(next) = NextSamplingHeader::get(){
-                if header.block_height != next {
-                    if <SubmitHeadersMap<T>>::contains_key(header.block_height) {
-                        if current_block > <SubmitHeadersMap<T>>::get(header.block_height)[0].challenge_block_height {
-                            Err(<Error<T>>::SubmitHeaderAlreadyComfirmed)?;
-                        }
-                    } else {
-                        Err(<Error<T>>::SubmitHeaderNotInSamplingList)?;
-                    }
-                }
-            }
+            // TODO: Save to ProposalMap
 
-            let who = ensure_signed(origin)?;
-            let block_height: types::EthereumBlockHeightType = header.block_height;
-            let mut submissions;
+            // TODO: call gen_sampling_blocks from pallet_sample
 
-            if <SubmitHeadersMap<T>>::contains_key(block_height) {
-                submissions = <SubmitHeadersMap<T>>::get(block_height);
-                let mut is_exist = false;
-                for rh in submissions.iter_mut() {
-                    if header == rh.header {
-                        rh.relayers.push(who.clone());
-                        is_exist = true;
-                        break;
-                    }
-                }
-                if !is_exist {
-                    let relay_header = types::RelayHeader::<<T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber> {
-                        header: header,
-                        relay_position: current_block,
-                        challenge_block_height: current_block + CHANGE_WAITING_BLOCKS.into(),
-                        relayers: vec![who.clone()]
-                    };
-                    submissions.push(relay_header);
-                }
-            } else {
-                let current_block = <frame_system::Module<T>>::block_number();
-                let relay_header = types::RelayHeader::<<T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber> {
-                    header: header,
-                    relay_position: current_block.into(),
-                    challenge_block_height: current_block + CHANGE_WAITING_BLOCKS.into(),
-                    relayers: vec![who.clone()]
-                };
-                submissions = vec![relay_header];
-                SubmitHeaders::mutate(|v| v.push(block_height));
-                let last_comfirm_header = if let Some(h) =LastComfirmedHeader::get() {h.block_height} else {0 as types::EthereumBlockHeightType};
-                let next_sampling_block_height = (last_comfirm_header + block_height) / 2;
-                NextSamplingHeader::put(next_sampling_block_height);
-            }
-            <SubmitHeadersMap<T>>::insert(block_height, submissions);
-
-            Self::deposit_event(RawEvent::SubmitHeader(block_height, who));
             Ok(())
         }
 
         fn offchain_worker(block: T::BlockNumber) {
-            let submit_headers  = SubmitHeaders::get();
-            let mut honest_relayers = Vec::new();
-            if let Some(last) = submit_headers.last() {
-                let submissions = <SubmitHeadersMap<T>>::get(last);
-                if submissions.len() == 1 && submissions[0].challenge_block_height < block {
-                    honest_relayers = submissions[0].relayers.clone();
-                    LastComfirmedHeader::put(submissions[0].header.clone());
-                    Self::deposit_event(
-                        RawEvent::UpdateLastComfrimedBlock(submissions[0].header.block_height,
-                                                           honest_relayers[0].clone()));
-                }
-
-            }
-            if honest_relayers.len() > 1 {
-                // TODO: slash and reward here
-                info!("Honest Relayers: {:?}", honest_relayers);
-            }
-
-            SubmitHeaders::mutate(|_| Vec::<types::EthereumBlockHeightType>::new());
-            NextSamplingHeader::mutate(|_| None as Option<types::EthereumBlockHeightType>);
         }
     }
 }
+impl<T: Trait> Module<T> {}

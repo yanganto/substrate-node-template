@@ -35,7 +35,8 @@ decl_storage! {
     trait Store for Module<T: Trait> as TemplateModule {
         ConfirmedBlocks get(fn confirmed_blocks): Vec<EthereumBlockHeightType>;
         /// the key is (disagree position, agree position)
-        SamplingBlocks get(fn sampling_blocks): map hasher(blake2_128_concat) (EthereumBlockHeightType, EthereumBlockHeightType) => EthereumBlockHeightType;
+        SamplingBlocksMap get(fn sampling_blocks_map): map hasher(blake2_128_concat) (EthereumBlockHeightType, EthereumBlockHeightType) => EthereumBlockHeightType;
+        pub SamplingBlocks get(fn sampling_blocks): Vec<EthereumBlockHeightType>;
     }
 }
 
@@ -71,14 +72,15 @@ decl_module! {
 
         #[weight = 0]
         pub fn gen_sampling_blocks(_origin, disagree: EthereumBlockHeightType, agree: EthereumBlockHeightType) -> dispatch::DispatchResult {
-            if !SamplingBlocks::contains_key((disagree, agree)) {
+            if !SamplingBlocksMap::contains_key((disagree, agree)) {
                 let r = <pallet_randomness_collective_flip::Module<T>>::random_seed();
                 let raw_sample_position = match T::ChainType::get() {
                     ChainType::POW => Self::get_sample_tail_more_from_random_number(disagree, agree, r),
                     _ => Self::get_sample_from_random_number(disagree, agree, r),
                 };
                 let sample_position = Self::handle_confirm_blocks_affinity(disagree, agree, raw_sample_position);
-                SamplingBlocks::insert((disagree, agree), sample_position);
+                SamplingBlocksMap::insert((disagree, agree), sample_position);
+                SamplingBlocks::mutate(|v| v.push(sample_position));
             }
             Ok(())
         }
