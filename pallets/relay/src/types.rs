@@ -24,7 +24,6 @@ pub struct Proposal<AccountId, BlockNumber> {
 
     /// Take-Over Proposal we use (header.block_height, header.lie) as Proposal ID
     pub take_over: Option<(EthereumBlockHeightType, u32)>,
-    pub relay_position: BlockNumber,
 
     /// The proposal level
     pub level: u32,

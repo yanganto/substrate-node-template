@@ -33,7 +33,7 @@ pub trait Trait: system::Trait {
 
 decl_storage! {
     trait Store for Module<T: Trait> as TemplateModule {
-        ConfirmedBlocks get(fn confirmed_blocks): Vec<EthereumBlockHeightType>;
+        pub ConfirmedBlocks get(fn confirmed_blocks): Vec<EthereumBlockHeightType>;
         /// the key is (disagree position, agree position)
         SamplingBlocksMap get(fn sampling_blocks_map): map hasher(blake2_128_concat) (EthereumBlockHeightType, EthereumBlockHeightType) => EthereumBlockHeightType;
         pub SamplingBlocks get(fn sampling_blocks): Vec<EthereumBlockHeightType>;

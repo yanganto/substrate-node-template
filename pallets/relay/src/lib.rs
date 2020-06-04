@@ -20,7 +20,10 @@ pub trait Trait: system::Trait + sample::Trait {
 decl_storage! {
     trait Store for Module<T: Trait> as Relay {
         /// This the `G` for as README of relayer-game
-        LastComfirmedHeader get(fn last_comfirm_header): Option<types::EthHeader>;
+        LastConfirmedHeader get(fn last_comfirm_header): Option<types::EthHeader>;
+
+        /// The blocks confrimed
+        ConfirmedBlocks get(fn confrimed_blocks): map hasher(blake2_128_concat) types::EthereumBlockHeightType => types::EthHeader;
 
         /// Here we use (header.block_height, header.lie) as Proposal ID to store
         /// In real scenario, we should use (header.block_height, header.hash) as Proposal ID
@@ -41,7 +44,7 @@ decl_event!(
     where
         AccountId = <T as system::Trait>::AccountId,
     {
-        UpdateLastComfrimedBlock(u32, AccountId),
+        UpdateLastConfrimedBlock(u32, AccountId),
         SubmitHeader(u32, AccountId),
     }
 );
@@ -68,9 +71,9 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let block_height = header.block_height;
 
-            LastComfirmedHeader::put(header);
+            LastConfirmedHeader::put(header);
 
-            Self::deposit_event(RawEvent::UpdateLastComfrimedBlock(block_height, who));
+            Self::deposit_event(RawEvent::UpdateLastConfrimedBlock(block_height, who));
             Ok(())
         }
 
@@ -139,7 +142,7 @@ decl_module! {
                 }
                 if agree.is_none() {
                     // use genesis or last comfirmed block for the agree point
-                    agree = if let Some(h) = LastComfirmedHeader::get() {
+                    agree = if let Some(h) = LastConfirmedHeader::get() {
                         Some(h.block_height)
                     }else {
                         Some(0)
@@ -165,7 +168,41 @@ decl_module! {
             Ok(())
         }
 
-        fn offchain_worker(_block: T::BlockNumber) {
+        // TODO: this offchain worker is a POC, it is not send data back on chain
+        // in production the mutation of data should be send back on chain
+        fn offchain_worker(block: T::BlockNumber) {
+            let highest_level = HighestLevel::get();
+            let proposals = <ProposalLevelMap<T>>::get(highest_level);
+
+            let mut over_challenge_time_list = Vec::<(types::EthereumBlockHeightType, u32)>::new();
+            let mut in_challenge_time_list = Vec::<(types::EthereumBlockHeightType, u32,T::BlockNumber)>::new();
+
+            if in_challenge_time_list.len() == 0 {
+                HighestLevel::put(highest_level-1);
+            }
+
+            for p_info in proposals {
+                if block > p_info.2 {
+                    over_challenge_time_list.push((p_info.0, p_info.1));
+                } else {
+                    in_challenge_time_list.push(p_info);
+                }
+            }
+            <ProposalLevelMap<T>>::mutate( highest_level, |_| in_challenge_time_list);
+
+            for proposal_id in over_challenge_time_list {
+                let proposal = <ProposalMap<T>>::take(proposal_id);
+
+                // NOTE In production check block integrality is not checking the lie flag
+                // NOTE In production, please try to use block_height + 1 and block_height - 1 to
+                // verify the block, althought over challenge time, we still need to be carefure to
+                // verify the blocks.
+                if proposal.header.lie == 0 {
+                    <sample::Call<T>>::confirm(proposal.header.block_height);
+                    ConfirmedBlocks::insert(proposal.header.block_height, proposal.header);
+                }
+            }
+
         }
     }
 }
