@@ -177,7 +177,7 @@ decl_module! {
             let mut over_challenge_time_list = Vec::<(types::EthereumBlockHeightType, u32)>::new();
             let mut in_challenge_time_list = Vec::<(types::EthereumBlockHeightType, u32,T::BlockNumber)>::new();
 
-            if in_challenge_time_list.len() == 0 {
+            if in_challenge_time_list.len() == 0 && highest_level > 0 {
                 HighestLevel::put(highest_level-1);
             }
 
@@ -191,15 +191,19 @@ decl_module! {
             <ProposalLevelMap<T>>::mutate( highest_level, |_| in_challenge_time_list);
 
             for proposal_id in over_challenge_time_list {
-                let proposal = <ProposalMap<T>>::take(proposal_id);
+                let mut p = Some(proposal_id);
+                while p.is_some() {
+                    let proposal = <ProposalMap<T>>::take(p.unwrap());
 
-                // NOTE In production check block integrality is not checking the lie flag
-                // NOTE In production, please try to use block_height + 1 and block_height - 1 to
-                // verify the block, althought over challenge time, we still need to be carefure to
-                // verify the blocks.
-                if proposal.header.lie == 0 {
-                    <sample::Call<T>>::confirm(proposal.header.block_height);
-                    ConfirmedBlocks::insert(proposal.header.block_height, proposal.header);
+                    // NOTE In production check block integrality is not checking the lie flag
+                    // NOTE In production, please try to use block_height + 1 and block_height - 1 to
+                    // verify the block, althought over challenge time, we still need to be carefure to
+                    // verify the blocks.
+                    if proposal.header.lie == 0  && !ConfirmedBlocks::contains_key(proposal.header.block_height) {
+                        <sample::Call<T>>::confirm(proposal.header.block_height);
+                        ConfirmedBlocks::insert(proposal.header.block_height, proposal.header);
+                    }
+                    p = proposal.take_over;
                 }
             }
 
