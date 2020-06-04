@@ -103,11 +103,15 @@ decl_module! {
             let submit_headers = SubmitHeaders::get();
 
             if submit_headers.contains(&proposal.header.block_height) {
+                if proposal.against.is_none() {
+                    Err(<Error<T>>::AgainstAbsent)?;
+                }
                 agree = Some(proposal.header.block_height);
                 let mut against_proposal_id = proposal.against;
                 while against_proposal_id.is_some(){
                     let against_proposal = <ProposalMap<T>>::get(against_proposal_id.unwrap());
                     if  against_proposal.header.block_height < proposal.header.block_height {
+                        against_proposal_id = against_proposal.take_over;
                         continue;
                     }
 
@@ -122,13 +126,11 @@ decl_module! {
                 }
 
             } else {
-                if proposal.against.is_none() {
-                    Err(<Error<T>>::AgainstAbsent)?;
-                }
                 let mut take_over_proposal_id = proposal.take_over;
                 while take_over_proposal_id.is_some() {
                     let take_over_proposal = <ProposalMap<T>>::get(take_over_proposal_id.unwrap());
                     if  take_over_proposal.header.block_height > proposal.header.block_height {
+                        take_over_proposal_id = take_over_proposal.take_over;
                         continue;
                     }
                     if agree.is_none() {
