@@ -1,8 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use frame_support::{debug::info, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
-use sample::SamplingBlocks;
-use sp_std::{prelude::Vec, vec};
+use sp_std::prelude::Vec;
 
 const CHANGE_WAITING_BLOCKS: u32 = 50;
 
@@ -70,7 +69,7 @@ decl_module! {
         }
 
         #[weight = 0]
-        pub fn submit(origin, proposal: types::Proposal::<T::AccountId, T::BlockNumber>) -> dispatch::DispatchResult {
+        pub fn submit(_origin, proposal: types::Proposal::<T::AccountId, T::BlockNumber>) -> dispatch::DispatchResult {
             info!(target: "relay", "submit proposal: {:?}", proposal);
 
             // NOTE In production, the handler should check this
@@ -145,17 +144,18 @@ decl_module! {
                 disagree = Some(against_proposal.header.block_height);
             }
 
-            // TODO: add a challenge_time for the proposal
             let current_block = <frame_system::Module<T>>::block_number();
+            let mut p = proposal.clone();
+            p.challenge_block_height = current_block + CHANGE_WAITING_BLOCKS.into();
+            <ProposalMap<T>>::insert((p.header.block_height, p.header.lie), p);
 
-            // TODO: Save to ProposalMap
-
-            // TODO: call gen_sampling_blocks from pallet_sample
-
+            if disagree.is_some(){
+                <sample::Call<T>>::gen_sampling_blocks(disagree.unwrap(), agree.unwrap());
+            }
             Ok(())
         }
 
-        fn offchain_worker(block: T::BlockNumber) {
+        fn offchain_worker(_block: T::BlockNumber) {
         }
     }
 }
