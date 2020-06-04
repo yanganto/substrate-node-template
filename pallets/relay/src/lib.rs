@@ -26,6 +26,12 @@ decl_storage! {
         /// In real scenario, we should use (header.block_height, header.hash) as Proposal ID
         ProposalMap get(fn proposal_map): map hasher(blake2_128_concat) (types::EthereumBlockHeightType, u32) => types::Proposal::<T::AccountId, T::BlockNumber>;
 
+        /// Here store all the proposals: key is level, value is Proposal ID and challenge time
+        ProposalLevelMap get(fn proposal_ids_by_level): map hasher(blake2_128_concat) u32 => Vec<(types::EthereumBlockHeightType, u32, T::BlockNumber)> ;
+
+        /// Store the highest proposal level
+        HighestLevel get(fn highest_level): u32;
+
         SubmitHeaders get(fn submit_headers): Vec<types::EthereumBlockHeightType>;
     }
 }
@@ -147,7 +153,11 @@ decl_module! {
             let current_block = <frame_system::Module<T>>::block_number();
             let mut p = proposal.clone();
             p.challenge_block_height = current_block + CHANGE_WAITING_BLOCKS.into();
+            <ProposalLevelMap<T>>::mutate(p.level, |v| v.push(( p.header.block_height, p.header.lie, p.challenge_block_height)));
             <ProposalMap<T>>::insert((p.header.block_height, p.header.lie), p);
+            if proposal.level > HighestLevel::get() {
+                HighestLevel::put(proposal.level)
+            }
 
             if disagree.is_some(){
                 <sample::Call<T>>::gen_sampling_blocks(disagree.unwrap(), agree.unwrap());
