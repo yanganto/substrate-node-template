@@ -4,7 +4,7 @@ use balances;
 use codec::{Decode, Encode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
-use sp_runtime::RuntimeDebug;
+use sp_std::prelude::Vec;
 
 use crate::sp_api_hidden_includes_decl_storage::hidden_include::traits::Randomness;
 
@@ -14,7 +14,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, RuntimeDebug)]
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Kitty<Hash, Balance> {
     id: Hash,
     dna: Hash,
