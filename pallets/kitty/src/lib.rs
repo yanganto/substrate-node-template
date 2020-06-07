@@ -2,7 +2,7 @@
 
 use balances;
 use codec::{Decode, Encode};
-use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
+use frame_support::{debug::trace, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
 
 // NOTE not really std, but similar
@@ -33,6 +33,7 @@ decl_storage! {
         OwnedKitty get(fn kitty_of_owner) : map hasher(identity) T::AccountId => Vec<T::Hash>;
         KittyOwner get(fn owner_of) : map hasher(blake2_128_concat) T::Hash => Option<T::AccountId>;
         Kitties get(fn kitties): map hasher(blake2_128_concat) T::Hash => Kitty<T::Hash, T::Balance>;
+        LastBornKitty get(fn last_born_kitty): T::Hash;
     }
 }
 
@@ -82,6 +83,7 @@ decl_module! {
             <Kitties<T>>::insert(r, new_kitty);
             <KittyOwner<T>>::insert(r, &owner);
             <OwnedKitty<T>>::mutate(&owner, |v| v.push(r));
+            <LastBornKitty<T>>::set(r);
 
             Ok(())
         }
@@ -119,8 +121,12 @@ decl_module! {
             <Kitties<T>>::insert(r, new_kitty);
             <KittyOwner<T>>::insert(r, &ownner);
             <OwnedKitty<T>>::mutate(&ownner, |v| v.push(r));
+            <LastBornKitty<T>>::set(r);
 
             Ok(())
+        }
+        fn offchain_worker(block: T::BlockNumber) {
+            trace!(target:"kitty", "Last born kitty: {:?}", <LastBornKitty<T>>::get());
         }
     }
 }
