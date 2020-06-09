@@ -41,3 +41,40 @@ fn test_rehect_set_lie_last_comfirm_header() {
         assert!(is_header.is_none());
     });
 }
+
+#[test]
+fn test_submission_take_over() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(Relay::submit(
+            Origin::signed(1),
+            vec![crate::types::EthHeader {
+                lie: 0,
+                block_height: 1000
+            }]
+        ));
+        assert_ok!(Relay::submit(
+            Origin::signed(2),
+            vec![
+                crate::types::EthHeader {
+                    lie: 0,
+                    block_height: 1000
+                },
+                crate::types::EthHeader {
+                    lie: 0,
+                    block_height: 500
+                }
+            ]
+        ));
+    });
+}
+
+#[test]
+fn test_current_submit_round_calculation() {
+    new_test_ext().execute_with(|| {
+        assert!(Relay::get_current_round_from_submit_length(1) == 1);
+        assert!(Relay::get_current_round_from_submit_length(2) == 2u32);
+        assert!(Relay::get_current_round_from_submit_length(4) == 3u32);
+        assert!(Relay::get_current_round_from_submit_length(8) == 4u32);
+        assert!(Relay::get_current_round_from_submit_length(16) == 5u32);
+    });
+}

@@ -80,14 +80,13 @@ decl_module! {
 
             let who = ensure_signed(origin)?;
 
-            // log_2 (header_length + 1)
-            let current_round = num_bits::<i32>() as u32 - (headers.len() + 1).leading_zeros() - 1;
+            let current_round = Self::get_current_round_from_submit_length(headers.len());
             info!(target: "relay", "submit round: {}, headers : {:?}", current_round, headers);
 
             // If submission not at first round, the submission should extend from previous
             // submission
             if current_round > 1 {
-                let last_sample_of_prvious_proposal = headers.len() - 2usize.pow(current_round -1) - 1;
+                let last_sample_of_prvious_proposal = headers.len() - 2usize.pow(current_round -2) - 1;
                 let prvious_round = current_round - 1;
                 let mut is_extend_from = false;
                 for p in <ProposalMap<T>>::get(headers[last_sample_of_prvious_proposal].block_height) {
@@ -142,4 +141,12 @@ decl_module! {
         }
     }
 }
-impl<T: Trait> Module<T> {}
+impl<T: Trait> Module<T> {
+    fn get_current_round_from_submit_length(length: usize) -> u32 {
+        if length == 1 {
+            return 1;
+        } else {
+            return num_bits::<isize>() as u32 - (length - 1).leading_zeros() + 1;
+        }
+    }
+}
