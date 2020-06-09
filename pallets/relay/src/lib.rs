@@ -46,7 +46,13 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
     {
         UpdateLastConfrimedBlock(types::EthereumBlockHeightType, AccountId),
-        SubmitHeaders(types::EthereumBlockHeightType, types::SubmitRound),
+
+        /// Publish event with first block height, last block height, and round
+        SubmitHeaders(
+            types::EthereumBlockHeightType,
+            types::EthereumBlockHeightType,
+            types::SubmitRound,
+        ),
     }
 );
 
@@ -136,16 +142,20 @@ decl_module! {
             //     }
             // }
 
-            let last_header = headers.last().unwrap();
-            if <ProposalMap<T>>::get(last_header.block_height).len() == 0 {
+            let first_header_block_height = headers.first().unwrap().block_height;
+            let last_header_block_height = headers.last().unwrap().block_height;
+            if <ProposalMap<T>>::get(last_header_block_height).len() == 0 {
                 let challenge_end_block = <frame_system::Module<T>>::block_number() + CHANGE_WAITING_BLOCKS.into();
-                <ChallengeTimes<T>>::mutate(challenge_end_block, |v| v.push((last_header.block_height, current_round)));
+                <ChallengeTimes<T>>::mutate(challenge_end_block, |v| v.push((last_header_block_height, current_round)));
             }
-            <ProposalMap<T>>::mutate(last_header.block_height, |v| v.push(types::Proposal{
+
+            <ProposalMap<T>>::mutate(last_header_block_height, |v| v.push(types::Proposal{
                 round: current_round,
                 relayer: who,
                 headers,
             }));
+
+            Self::deposit_event(RawEvent::SubmitHeaders(first_header_block_height, last_header_block_height, current_round));
 
             Ok(())
         }
