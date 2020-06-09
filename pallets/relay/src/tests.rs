@@ -43,15 +43,45 @@ fn test_rehect_set_lie_last_comfirm_header() {
 }
 
 #[test]
-fn test_submission_take_over() {
+fn test_submission_take_over_should_follow_sample() {
     new_test_ext().execute_with(|| {
         assert_ok!(Relay::submit(
             Origin::signed(1),
+            vec![crate::types::EthHeader {
+                lie: 1,
+                block_height: 1000
+            }]
+        ));
+
+        // Do challenge with header
+        assert_ok!(Relay::submit(
+            Origin::signed(2),
             vec![crate::types::EthHeader {
                 lie: 0,
                 block_height: 1000
             }]
         ));
+
+        assert_noop!(
+            Relay::submit(
+                Origin::signed(2),
+                vec![
+                    crate::types::EthHeader {
+                        lie: 0,
+                        block_height: 1000
+                    },
+                    crate::types::EthHeader {
+                        lie: 0,
+                        block_height: 500
+                    }
+                ]
+            ),
+            Error::<Test>::NotComplyWithSamples
+        );
+
+        // simulate over challenge time and the sample set extends
+        Relay::set_samples(vec![1000, 500]);
+
         assert_ok!(Relay::submit(
             Origin::signed(2),
             vec![

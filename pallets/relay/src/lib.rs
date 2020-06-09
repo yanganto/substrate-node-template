@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use frame_support::{debug::info, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{self as system, ensure_signed};
-use sp_std::prelude::Vec;
+use sp_std::{prelude::Vec, vec};
 
 const CHANGE_WAITING_BLOCKS: u32 = 50;
 
@@ -34,6 +34,9 @@ decl_storage! {
 
         /// use the block number of challenge time as key to last round header.block_height and round
         ChallengeTimes get(fn challenge_time): map hasher(blake2_128_concat) T::BlockNumber =>  Vec<(types::EthereumBlockHeightType, types::SubmitRound)>;
+
+        /// The allow samples for each game, the block height of first submit is the key
+        Samples get(fn get_samples): map hasher(blake2_128_concat) types::EthereumBlockHeightType => Vec<types::EthereumBlockHeightType>;
     }
 }
 
@@ -51,6 +54,7 @@ decl_error! {
     pub enum Error for Module<T: Trait> {
         HeaderInvalid,
         NotExtendFromError,
+        NotComplyWithSamples,
     }
 }
 
@@ -85,7 +89,19 @@ decl_module! {
 
             // If submission not at first round, the submission should extend from previous
             // submission
-            if current_round > 1 {
+            if current_round == 1 {
+                Self::set_samples(vec![headers[0].block_height]);
+            } else {
+                let samples = Samples::get(headers[0].block_height);
+                if samples.len() !=  headers.len() {
+                    Err(<Error<T>>::NotComplyWithSamples)?;
+                }
+                for (idx, s) in samples.into_iter().enumerate() {
+                    if s != headers[idx].block_height {
+                        Err(<Error<T>>::NotComplyWithSamples)?;
+                    }
+                }
+
                 let last_sample_of_prvious_proposal = headers.len() - 2usize.pow(current_round -2) - 1;
                 let prvious_round = current_round - 1;
                 let mut is_extend_from = false;
@@ -114,11 +130,11 @@ decl_module! {
             }
             // Validate Blocks
             // NOTE In production, the handler should check this
-            for header in &headers {
-                if header.lie > 0 {
-                    Err(<Error<T>>::HeaderInvalid)?;
-                }
-            }
+            // for header in &headers {
+            //     if header.lie > 0 {
+            //         Err(<Error<T>>::HeaderInvalid)?;
+            //     }
+            // }
 
             let last_header = headers.last().unwrap();
             if <ProposalMap<T>>::get(last_header.block_height).len() == 0 {
@@ -148,5 +164,19 @@ impl<T: Trait> Module<T> {
         } else {
             return num_bits::<isize>() as u32 - (length - 1).leading_zeros() + 1;
         }
+    }
+    fn set_samples(new_samples: Vec<types::EthereumBlockHeightType>) {
+        if new_samples.len() > 1 {
+            let samples = Samples::get(new_samples[0]);
+            if samples.len() == 0 {
+                panic!("setup samples should be extend from before");
+            }
+            for (idx, s) in samples.into_iter().enumerate() {
+                if s != new_samples[idx] {
+                    panic!("setup samples should be extend from before");
+                }
+            }
+        }
+        Samples::insert(new_samples[0], new_samples);
     }
 }
