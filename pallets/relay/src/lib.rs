@@ -4,6 +4,7 @@ use frame_system::{self as system, ensure_signed};
 use sp_std::{prelude::Vec, vec};
 
 const CHANGE_WAITING_BLOCKS: u32 = 50;
+const BOND_VALUE: u32 = 100;
 
 #[cfg(test)]
 mod mock;
@@ -128,7 +129,7 @@ decl_module! {
                     Err(<Error<T>>::NotExtendFromError)?;
                 }
             } else if Samples::get(headers[0].block_height).len() == 0{
-                Self::set_samples(vec![headers[0].block_height]);
+                Self::set_samples(&vec![headers[0].block_height]);
             }
 
             if headers.len() == 0 {
@@ -144,6 +145,8 @@ decl_module! {
 
             let first_header_block_height = headers.first().unwrap().block_height;
             let last_header_block_height = headers.last().unwrap().block_height;
+
+            // update the challenge time when the first submit of the round comes in
             if <ProposalMap<T>>::get(last_header_block_height).len() == 0 {
                 let challenge_end_block = <frame_system::Module<T>>::block_number() + CHANGE_WAITING_BLOCKS.into();
                 <ChallengeTimes<T>>::mutate(challenge_end_block, |v| v.push((last_header_block_height, current_round)));
@@ -163,7 +166,56 @@ decl_module! {
         // TODO: this offchain worker is a POC, it is not send data back on chain
         // in production the mutation of data should be send back on chain
         fn offchain_worker(block: T::BlockNumber) {
+            let proposal_queries = <ChallengeTimes<T>>::take(block);
+            if proposal_queries.len() > 0 {
+                for (last_eth_block_height, round)  in proposal_queries.into_iter(){
+                    let proposal_set: Vec<types::Proposal::<T::AccountId>> =
+                        <ProposalMap<T>>::get(last_eth_block_height).into_iter().filter(|p| p.round == round).collect();
 
+                    // No dispute on this proposal, confirm all blocks
+                    if proposal_set.len() == 1 {
+                        for (idx, &h) in proposal_set[0].headers.iter().enumerate() {
+                            let mut previous_proposal_set: Vec<types::Proposal::<T::AccountId>> = Vec::new();
+                            <ProposalMap<T>>::mutate(h.block_height, |v|{
+                                let mut remind_proposal_set: Vec<types::Proposal::<T::AccountId>> = Vec::new();
+                                for p in v.iter(){
+                                    if p.round == idx as u32 + 1 {
+                                        previous_proposal_set.push(p.clone());
+                                    } else {
+                                        remind_proposal_set.push(p.clone());
+                                    }
+                                }
+                                remind_proposal_set
+                            });
+                            let mut honest_one: Option<types::Proposal::<T::AccountId>> = None;
+                            let number_of_lier = previous_proposal_set.len() as u32 - 1;
+                            for p in previous_proposal_set.into_iter() {
+                                if p.headers ==  proposal_set[0].headers {
+                                    honest_one = Some(p);
+                                } else {
+                                    Self::slash_by_proposal(&p, BOND_VALUE);
+                                }
+                            }
+                            if let Some(p) = honest_one {
+                                Self::reward_by_proposal(&p, BOND_VALUE * number_of_lier);
+                            } else {
+                                // the last propsoal should be extend from one of the proposal
+                                // and we deem it as honest
+                                panic!("There should not be one as the subset");
+                            }
+                        }
+                    } else {
+                        // There are still more than one voice, add samples and open the next round
+                        let current_samples = Samples::get(proposal_set[0].headers[0].block_height);
+                        let last_comfirm_block_height = match LastConfirmedHeader::get() {
+                            Some(h) => h.block_height,
+                            None => 0
+                        };
+                        let new_samples = Self::update_samples(&current_samples, last_comfirm_block_height);
+                        Self::set_samples(&new_samples);
+                    }
+                }
+            }
         }
     }
 }
@@ -175,7 +227,7 @@ impl<T: Trait> Module<T> {
             return num_bits::<isize>() as u32 - (length - 1).leading_zeros() + 1;
         }
     }
-    fn set_samples(new_samples: Vec<types::EthereumBlockHeightType>) {
+    fn set_samples(new_samples: &Vec<types::EthereumBlockHeightType>) {
         if new_samples.len() > 1 {
             let samples = Samples::get(new_samples[0]);
             if samples.len() == 0 {
@@ -188,5 +240,19 @@ impl<T: Trait> Module<T> {
             }
         }
         Samples::insert(new_samples[0], new_samples);
+    }
+    fn update_samples(
+        _current_samples: &Vec<types::EthereumBlockHeightType>,
+        _last_comfirm_block_height: types::EthereumBlockHeightType,
+    ) -> Vec<types::EthereumBlockHeightType> {
+        Vec::new()
+    }
+    fn reward_by_proposal(proposal: &types::Proposal<T::AccountId>, value: u32) {
+        #[cfg(feature = "std")]
+        println!("reward {} to {:?}", value, &proposal.relayer);
+    }
+    fn slash_by_proposal(proposal: &types::Proposal<T::AccountId>, value: u32) {
+        #[cfg(feature = "std")]
+        println!("slash {} to {:?}", value, &proposal.relayer);
     }
 }

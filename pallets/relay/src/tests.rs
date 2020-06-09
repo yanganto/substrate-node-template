@@ -80,7 +80,7 @@ fn test_submission_take_over_should_follow_sample() {
         );
 
         // simulate over challenge time and the sample set extends
-        Relay::set_samples(vec![1000, 500]);
+        Relay::set_samples(&vec![1000, 500]);
 
         assert_ok!(Relay::submit(
             Origin::signed(2),
