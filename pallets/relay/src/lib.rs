@@ -89,9 +89,7 @@ decl_module! {
 
             // If submission not at first round, the submission should extend from previous
             // submission
-            if current_round == 1 {
-                Self::set_samples(vec![headers[0].block_height]);
-            } else {
+            if current_round > 1 {
                 let samples = Samples::get(headers[0].block_height);
                 if samples.len() !=  headers.len() {
                     Err(<Error<T>>::NotComplyWithSamples)?;
@@ -123,6 +121,8 @@ decl_module! {
                 if ! is_extend_from {
                     Err(<Error<T>>::NotExtendFromError)?;
                 }
+            } else if Samples::get(headers[0].block_height).len() == 0{
+                Self::set_samples(vec![headers[0].block_height]);
             }
 
             if headers.len() == 0 {
