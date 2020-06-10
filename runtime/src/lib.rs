@@ -43,7 +43,6 @@ pub use sp_runtime::{Perbill, Permill};
 pub use timestamp::Call as TimestampCall;
 
 pub use relay;
-pub use sample;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -254,17 +253,6 @@ impl sudo::Trait for Runtime {
     type Call = Call;
 }
 
-parameter_types! {
-    pub const ChainType: sample::ChainType = sample::ChainType::Normal;
-    pub const ConfrimBlockAttractRange: sample::EthereumBlockHeightType = 10;
-}
-
-impl sample::Trait for Runtime {
-    type Event = Event;
-    type ChainType = ChainType;
-    type ConfrimBlockAttractRange = ConfrimBlockAttractRange;
-}
-
 impl relay::Trait for Runtime {
     type Event = Event;
 }
@@ -283,7 +271,6 @@ construct_runtime!(
         Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
         Sudo: sudo::{Module, Call, Config<T>, Storage, Event<T>},
-        SampleFunction: sample::{Module, Call, Storage, Event<T>},
         Relay: relay::{Module, Call, Storage, Event<T>},
     }
 );

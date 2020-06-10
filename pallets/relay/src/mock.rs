@@ -24,8 +24,6 @@ parameter_types! {
     pub const MaximumBlockWeight: Weight = 1024;
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
-    pub const ChainType: sample::ChainType = sample::ChainType::Normal;
-    pub const ConfrimBlockAttractRange: sample::EthereumBlockHeightType = 10;
 }
 impl system::Trait for Test {
     type Origin = Origin;
@@ -51,12 +49,6 @@ impl system::Trait for Test {
     type AccountData = ();
     type OnNewAccount = ();
     type OnKilledAccount = ();
-}
-
-impl sample::Trait for Test {
-    type Event = ();
-    type ChainType = ChainType;
-    type ConfrimBlockAttractRange = ConfrimBlockAttractRange;
 }
 
 impl Trait for Test {

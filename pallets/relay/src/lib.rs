@@ -14,7 +14,7 @@ mod tests;
 
 mod types;
 
-pub trait Trait: system::Trait + sample::Trait {
+pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
@@ -251,13 +251,13 @@ decl_module! {
                         }
                     } else {
                         // There are still more than one voice, add samples and open the next round
-                        let mut current_samples = Samples::get(proposal_set[0].headers[0].block_height);
+                        let mut samples = Samples::get(proposal_set[0].headers[0].block_height);
                         let last_comfirm_block_height = match LastConfirmedHeader::get() {
                             Some(h) => h.block_height,
                             None => 0
                         };
-                        let new_samples = Self::update_samples(&mut current_samples, last_comfirm_block_height);
-                        Self::set_samples(&new_samples);
+                        Self::update_samples(&mut samples, last_comfirm_block_height);
+                        Self::set_samples(&samples);
                     }
                 }
             }
@@ -265,13 +265,6 @@ decl_module! {
     }
 }
 impl<T: Trait> Module<T> {
-    fn get_current_round_from_submit_length(length: usize) -> u32 {
-        if length == 1 {
-            return 1;
-        } else {
-            return num_bits::<isize>() as u32 - (length - 1).leading_zeros() + 1;
-        }
-    }
     fn set_samples(new_samples: &Vec<types::EthereumBlockHeightType>) {
         if new_samples.len() > 1 {
             let samples = Samples::get(new_samples[0]);
@@ -286,12 +279,28 @@ impl<T: Trait> Module<T> {
         }
         Samples::insert(new_samples[0], new_samples);
     }
+
+    fn get_current_round_from_submit_length(length: usize) -> u32 {
+        if length == 1 {
+            return 1;
+        } else {
+            return num_bits::<isize>() as u32 - (length - 1).leading_zeros() + 1;
+        }
+    }
+
     fn update_samples(
-        _current_samples: &mut Vec<types::EthereumBlockHeightType>,
-        _last_comfirm_block_height: types::EthereumBlockHeightType,
-    ) -> Vec<types::EthereumBlockHeightType> {
-        // Vec::new()
-        vec![1000, 500]
+        current_samples: &mut Vec<types::EthereumBlockHeightType>,
+        last_comfirm_block_height: types::EthereumBlockHeightType,
+    ) {
+        let mut sorted_samples = current_samples.clone();
+        sorted_samples.push(last_comfirm_block_height);
+        sorted_samples.sort();
+
+        let mut extend_sample_list = Vec::<types::EthereumBlockHeightType>::new();
+        for i in 0..current_samples.len() {
+            extend_sample_list.push((sorted_samples[i] + sorted_samples[i + 1]) / 2);
+        }
+        current_samples.append(&mut extend_sample_list);
     }
     fn reward_by_proposal(proposal: &types::Proposal<T::AccountId>, value: u32) {
         #[cfg(feature = "std")]

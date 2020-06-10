@@ -112,6 +112,12 @@ fn test_current_submit_round_calculation() {
 #[test]
 fn test_update_samples() {
     new_test_ext().execute_with(|| {
-        // assert_eq!(Relay::update_samples(&mut vec![1000], 0), vec![1000, 500]);
+        let mut samples = vec![1000];
+        Relay::update_samples(&mut samples, 0);
+        assert_eq!(samples, vec![1000, 500]);
+        Relay::update_samples(&mut samples, 0);
+        assert_eq!(samples, vec![1000, 500, 250, 750]);
+        Relay::update_samples(&mut samples, 0);
+        assert_eq!(samples, vec![1000, 500, 250, 750, 125, 375, 625, 875]);
     });
 }
