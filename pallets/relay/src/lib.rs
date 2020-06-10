@@ -94,7 +94,23 @@ decl_module! {
             let current_round = Self::get_current_round_from_submit_length(headers.len());
             info!(target: "relay", "submit round: {}, headers : {:?}", current_round, headers);
 
-            let last_block_hash_of_previous_round: Option<u32> = None;
+            let mut last_block_hash_of_previous_round: Option<(types::EthereumBlockHeightType, u32)> = None;
+
+            if headers.len() == 0 {
+                Err(<Error<T>>::HeaderInvalid)?;
+            }
+
+            // Validate Blocks
+            // NOTE In production, the handler should check this
+            // for header in &headers {
+            //     if header.lie > 0 {
+            //         Err(<Error<T>>::HeaderInvalid)?;
+            //     }
+            // }
+
+            // After validated, the headers will be shrinked for headers in current round only,
+            // so the mutability chganged
+            let mut headers = headers;
 
             // If submission not at first round, the submission should extend from previous
             // submission
@@ -111,9 +127,16 @@ decl_module! {
 
                 let last_sample_of_prvious_proposal = headers.len() - 2usize.pow(current_round -2) - 1;
                 let prvious_round = current_round - 1;
+
+                // Check the proposal is extended from some proposal before
+                // The "Cut in line" scenario is not allowed in this implementation
                 let mut is_extend_from = false;
                 for p in <ProposalMap<T>>::get(headers[last_sample_of_prvious_proposal].block_height) {
                     if p.round == prvious_round  {
+                        let last_header = p.headers.last().unwrap();
+                        last_block_hash_of_previous_round = Some((last_header.block_height, last_header.lie));
+                        let num_of_samples_in_round = p.headers.len();
+
                         let mut all_header_equal = true;
                         for (i, h) in p.headers.into_iter().enumerate() {
                             if h != headers[i] {
@@ -121,8 +144,12 @@ decl_module! {
                                 break;
                             }
                         }
+
                         if all_header_equal {
                             is_extend_from = true;
+
+                            // save sample headers of the current rount only
+                            headers = headers[num_of_samples_in_round ..].to_vec();
                             break;
                         }
                     }
@@ -133,17 +160,6 @@ decl_module! {
             } else if Samples::get(headers[0].block_height).len() == 0{
                 Self::set_samples(&vec![headers[0].block_height]);
             }
-
-            if headers.len() == 0 {
-                Err(<Error<T>>::HeaderInvalid)?;
-            }
-            // Validate Blocks
-            // NOTE In production, the handler should check this
-            // for header in &headers {
-            //     if header.lie > 0 {
-            //         Err(<Error<T>>::HeaderInvalid)?;
-            //     }
-            // }
 
             let first_header_block_height = headers.first().unwrap().block_height;
             let last_header_block_height = headers.last().unwrap().block_height;
@@ -190,21 +206,47 @@ decl_module! {
                                 }
                                 remind_proposal_set
                             });
-                            let mut honest_one: Option<types::Proposal::<T::AccountId>> = None;
-                            let number_of_lier = previous_proposal_set.len() as u32 - 1;
-                            for p in previous_proposal_set.into_iter() {
-                                if p.headers ==  proposal_set[0].headers {
-                                    honest_one = Some(p);
-                                } else {
-                                    Self::slash_by_proposal(&p, BOND_VALUE);
-                                }
-                            }
-                            if let Some(p) = honest_one {
-                                Self::reward_by_proposal(&p, BOND_VALUE * number_of_lier);
+                        }
+
+                        let mut proposal_extend_from = proposal_set[0].extend_from;
+                        let mut round = proposal_set[0].round;
+                        loop {
+                            round -= 1;
+                            if proposal_extend_from.is_none(){ // The root proposal
+                                Self::reward_by_proposal(&proposal_set[0], BOND_VALUE);
+                                break
                             } else {
-                                // the last propsoal should be extend from one of the proposal
-                                // and we deem it as honest
-                                panic!("There should not be one as the subset");
+                                let previous_proposal_id = proposal_extend_from.unwrap();
+                                let mut previous_proposal_set: Vec<types::Proposal::<T::AccountId>> = Vec::new();
+                                <ProposalMap<T>>::mutate(previous_proposal_id.0, |v|{
+                                    let mut remind_proposal_set: Vec<types::Proposal::<T::AccountId>> = Vec::new();
+                                    for p in v.iter(){
+                                        if p.round == round {
+                                            previous_proposal_set.push(p.clone());
+                                        } else {
+                                            remind_proposal_set.push(p.clone());
+                                        }
+                                    }
+                                    remind_proposal_set
+                                });
+                                let mut honest_one: Option<types::Proposal::<T::AccountId>> = None;
+                                let number_of_lier = previous_proposal_set.len() as u32 - 1;
+                                for p in previous_proposal_set.into_iter() {
+                                    // In production compare hash here
+                                    if p.headers.last().unwrap().lie ==  previous_proposal_id.1 {
+                                        honest_one = Some(p);
+                                    } else {
+                                        Self::slash_by_proposal(&p, BOND_VALUE);
+                                    }
+                                }
+                                if let Some(p) = honest_one {
+                                    Self::reward_by_proposal(&p, BOND_VALUE * number_of_lier);
+                                    proposal_extend_from = p.extend_from;
+                                } else {
+                                    // the last propsoal should be extend from one of the proposal
+                                    // and we deem it as honest
+                                    panic!("There should not be one as the subset");
+                                }
                             }
                         }
                     } else {
