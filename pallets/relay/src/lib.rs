@@ -94,6 +94,8 @@ decl_module! {
             let current_round = Self::get_current_round_from_submit_length(headers.len());
             info!(target: "relay", "submit round: {}, headers : {:?}", current_round, headers);
 
+            let last_block_hash_of_previous_round: Option<u32> = None;
+
             // If submission not at first round, the submission should extend from previous
             // submission
             if current_round > 1 {
@@ -155,6 +157,7 @@ decl_module! {
             <ProposalMap<T>>::mutate(last_header_block_height, |v| v.push(types::Proposal{
                 round: current_round,
                 relayer: who,
+                extend_from: last_block_hash_of_previous_round,
                 headers,
             }));
 
@@ -206,12 +209,12 @@ decl_module! {
                         }
                     } else {
                         // There are still more than one voice, add samples and open the next round
-                        let current_samples = Samples::get(proposal_set[0].headers[0].block_height);
+                        let mut current_samples = Samples::get(proposal_set[0].headers[0].block_height);
                         let last_comfirm_block_height = match LastConfirmedHeader::get() {
                             Some(h) => h.block_height,
                             None => 0
                         };
-                        let new_samples = Self::update_samples(&current_samples, last_comfirm_block_height);
+                        let new_samples = Self::update_samples(&mut current_samples, last_comfirm_block_height);
                         Self::set_samples(&new_samples);
                     }
                 }
@@ -242,10 +245,11 @@ impl<T: Trait> Module<T> {
         Samples::insert(new_samples[0], new_samples);
     }
     fn update_samples(
-        _current_samples: &Vec<types::EthereumBlockHeightType>,
+        _current_samples: &mut Vec<types::EthereumBlockHeightType>,
         _last_comfirm_block_height: types::EthereumBlockHeightType,
     ) -> Vec<types::EthereumBlockHeightType> {
-        Vec::new()
+        // Vec::new()
+        vec![1000, 500]
     }
     fn reward_by_proposal(proposal: &types::Proposal<T::AccountId>, value: u32) {
         #[cfg(feature = "std")]

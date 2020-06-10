@@ -23,4 +23,8 @@ pub struct Proposal<AccountId> {
 
     /// Record the relayer submit the same blocks
     pub relayer: AccountId,
+
+    /// Here we use storage the block heigh and lie for the last sample block of previous round,
+    /// but in production, this will be block heigh and hash
+    pub extend_from: Option<(EthereumBlockHeightType, u32)>,
 }

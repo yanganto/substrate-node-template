@@ -108,3 +108,10 @@ fn test_current_submit_round_calculation() {
         assert!(Relay::get_current_round_from_submit_length(16) == 5u32);
     });
 }
+
+#[test]
+fn test_update_samples() {
+    new_test_ext().execute_with(|| {
+        // assert_eq!(Relay::update_samples(&mut vec![1000], 0), vec![1000, 500]);
+    });
+}
