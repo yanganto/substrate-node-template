@@ -245,7 +245,7 @@ decl_module! {
                                 } else {
                                     // the last propsoal should be extend from one of the proposal
                                     // and we deem it as honest
-                                    panic!("There should not be one as the subset");
+                                    panic!("There should be a one");
                                 }
                             }
                         }
