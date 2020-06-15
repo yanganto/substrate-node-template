@@ -125,20 +125,20 @@ decl_module! {
                     }
                 }
 
-                let last_sample_of_prvious_proposal = headers.len() - 2usize.pow(current_round -2) - 1;
-                let prvious_round = current_round - 1;
+                let last_sample_of_previous_proposal = headers.len() - 2usize.pow(current_round -2) - 1;
+                let previous_round = current_round - 1;
 
                 // Check the proposal is extended from some proposal before
                 // The "Cut in line" scenario is not allowed in this implementation
                 let mut is_extend_from = false;
-                for p in <ProposalMap<T>>::get(headers[last_sample_of_prvious_proposal].block_height) {
-                    if p.round == prvious_round  {
+                for p in <ProposalMap<T>>::get(headers[last_sample_of_previous_proposal].block_height) {
+                    if p.round == previous_round  {
                         let last_header = p.headers.last().unwrap();
                         last_block_hash_of_previous_round = Some((last_header.block_height, last_header.lie));
                         let num_of_samples_in_round = p.headers.len();
 
                         let mut all_header_equal = true;
-                        for (i, h) in p.headers.into_iter().enumerate() {
+                        for (i, h) in Self::get_all_headers_from(&p).into_iter().enumerate() {
                             if h != headers[i] {
                                 all_header_equal = false;
                                 break;
@@ -193,21 +193,6 @@ decl_module! {
 
                     // No dispute on this proposal, confirm all blocks
                     if proposal_set.len() == 1 {
-                        for (idx, &h) in proposal_set[0].headers.iter().enumerate() {
-                            let mut previous_proposal_set: Vec<types::Proposal::<T::AccountId>> = Vec::new();
-                            <ProposalMap<T>>::mutate(h.block_height, |v|{
-                                let mut remind_proposal_set: Vec<types::Proposal::<T::AccountId>> = Vec::new();
-                                for p in v.iter(){
-                                    if p.round == idx as u32 + 1 {
-                                        previous_proposal_set.push(p.clone());
-                                    } else {
-                                        remind_proposal_set.push(p.clone());
-                                    }
-                                }
-                                remind_proposal_set
-                            });
-                        }
-
                         let mut proposal_extend_from = proposal_set[0].extend_from;
                         let mut round = proposal_set[0].round;
                         loop {
@@ -227,7 +212,7 @@ decl_module! {
                                             remind_proposal_set.push(p.clone());
                                         }
                                     }
-                                    remind_proposal_set
+                                    *v = remind_proposal_set
                                 });
                                 let mut honest_one: Option<types::Proposal::<T::AccountId>> = None;
                                 let number_of_lier = previous_proposal_set.len() as u32 - 1;
@@ -309,5 +294,26 @@ impl<T: Trait> Module<T> {
     fn slash_by_proposal(proposal: &types::Proposal<T::AccountId>, value: u32) {
         #[cfg(feature = "std")]
         println!("slash {} to {:?}", value, &proposal.relayer);
+    }
+    /// show all the headers the propoasl extend from
+    fn get_all_headers_from(proposal: &types::Proposal<T::AccountId>) -> Vec<types::EthHeader> {
+        let mut outputs = Vec::new();
+        let mut pid: Option<(types::EthereumBlockHeightType, u32)> = Some((
+            proposal.headers.last().unwrap().block_height,
+            proposal.round,
+        ));
+        loop {
+            let mut proposal = <ProposalMap<T>>::get(pid.unwrap().0);
+            for p in proposal.iter_mut() {
+                if p.headers.last().unwrap().lie == pid.unwrap().1 {
+                    pid = p.extend_from;
+                    outputs.append(&mut p.headers);
+                }
+            }
+            if pid.is_none() {
+                break;
+            }
+        }
+        outputs
     }
 }
